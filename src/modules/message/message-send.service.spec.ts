@@ -143,6 +143,11 @@ describe('MessageSendService', () => {
       expect(mockEngine.sendTextMessage).toHaveBeenCalledWith('628123456789@c.us', 'Hello');
     });
 
+    it('qualifies bare phone numbers to @c.us before sending to a non-saved contact', async () => {
+      await service.sendText('sess-1', { chatId: '5511999999999', text: 'hi' });
+      expect(mockEngine.sendTextMessage).toHaveBeenCalledWith('5511999999999@c.us', 'hi');
+    });
+
     it('threads mentions through to the engine (#530)', async () => {
       const input = { chatId: '120@g.us', text: 'hi @62811', mentions: ['62811@c.us'] };
       (hookManager.execute as jest.Mock).mockResolvedValueOnce({
