@@ -56,6 +56,7 @@ OpenWA v0.2+ implements a **dual-database architecture** that separates boot con
 │                             │ • baileys_stored_messages (engine)│
 │                             │ • lid_mappings (engine)           │
 │                             │ • automation_rules                │
+│                             │ • ai_bot_chats                    │
 └─────────────────────────────┴───────────────────────────────────┘
 ```
 
@@ -465,6 +466,28 @@ CREATE TABLE automation_rules (
 );
 ```
 
+The opt-in AI assistant (`AI_BOT_ENABLED`) keeps its per-chat state next to the rules, one row per
+(session, chat) it has acted in. `firstReplyAt` is the baseline of its human-takeover check: only an
+operator message newer than the assistant's first reply silences it, so the campaign message that
+opened the conversation does not. A non-null `handoffAt` keeps it silent until the chat is resumed.
+
+```sql
+CREATE TABLE ai_bot_chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "sessionId" VARCHAR NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    "chatId" VARCHAR NOT NULL,
+    "customerName" VARCHAR(100),           -- how the person asked to be called
+    "firstReplyAt" TIMESTAMP,              -- assistant's first message; takeover baseline
+    "followUpSentAt" TIMESTAMP,            -- sales follow-up to the contact's automatic greeting
+    "introducedAt" TIMESTAMP,              -- introduced itself as a virtual assistant to a person
+    "handoffAt" TIMESTAMP,                 -- set: the chat belongs to a human
+    "handoffReason" VARCHAR(300),
+    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE ("sessionId", "chatId")
+);
+```
+
 ---
 
 ### 5.3.3 messages
@@ -785,10 +808,10 @@ flowchart LR
 
 OpenWA runs **two separate TypeORM connections**, each with its own migrations directory and CLI DataSource:
 
-| Connection | DataSource            | Migrations dir                  | Owns                                                                                                                                                                                                                                                                                                     |
-| ---------- | --------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **main**   | `data-source-main.ts` | `src/database/migrations-main/` | `api_keys`, `audit_logs` — always SQLite (`./data/main.sqlite` by default)                                                                                                                                                                                                                               |
-| **data**   | `data-source.ts`      | `src/database/migrations/`      | `sessions`, `webhooks`, `messages`, `message_batches`, `templates`, `status_updates`, `automation_rules`, `webhook_delivery_failures`, the integration tables (`plugin_instances`, `ingress_events`, `conversation_mappings`, `integration_delivery_failures`), engine tables — SQLite **or** PostgreSQL |
+| Connection | DataSource            | Migrations dir                  | Owns                                                                                                                                                                                                                                                                                                                     |
+| ---------- | --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **main**   | `data-source-main.ts` | `src/database/migrations-main/` | `api_keys`, `audit_logs` — always SQLite (`./data/main.sqlite` by default)                                                                                                                                                                                                                                               |
+| **data**   | `data-source.ts`      | `src/database/migrations/`      | `sessions`, `webhooks`, `messages`, `message_batches`, `templates`, `status_updates`, `automation_rules`, `ai_bot_chats`, `webhook_delivery_failures`, the integration tables (`plugin_instances`, `ingress_events`, `conversation_mappings`, `integration_delivery_failures`), engine tables — SQLite **or** PostgreSQL |
 
 Migrations are hand-authored and idempotent (`IF NOT EXISTS`) so they are safe to adopt on a database originally created by `synchronize`. The two connections differ in how schema is managed:
 

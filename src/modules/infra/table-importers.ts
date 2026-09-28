@@ -16,6 +16,7 @@ import type {
   IntegrationDeliveryFailureRow,
   StatusUpdateRow,
   AutomationRuleRow,
+  AiBotChatRow,
 } from './migration-tables.types';
 
 // A per-table restore step for importData: which backup key to read, the exact INSERT text (kept in
@@ -412,6 +413,27 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       rule.updatedAt,
     ],
   }),
+  // Import the AI assistant's per-chat state (FK sessions ON DELETE CASCADE, same as the rules above).
+  defineTableImporter({
+    key: 'aiBotChats',
+    label: 'AI assistant chat',
+    sql: `INSERT INTO ai_bot_chats (id, "sessionId", "chatId", "customerName", "firstReplyAt", "followUpSentAt", "introducedAt", "handoffAt", "handoffReason", "createdAt", "updatedAt")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    id: (chat: AiBotChatRow) => chat.id,
+    map: (chat: AiBotChatRow) => [
+      chat.id,
+      chat.sessionId,
+      chat.chatId,
+      chat.customerName ?? null,
+      chat.firstReplyAt ?? null,
+      chat.followUpSentAt ?? null,
+      chat.introducedAt ?? null,
+      chat.handoffAt ?? null,
+      chat.handoffReason ?? null,
+      chat.createdAt,
+      chat.updatedAt,
+    ],
+  }),
 ];
 
 // The `as TableCounts` cast in importData means a dropped or mis-keyed descriptor is invisible to
@@ -433,6 +455,7 @@ const EXPECTED_TABLE_KEYS: ReadonlyArray<keyof MigrationTables> = [
   'integrationDeliveryFailures',
   'statusUpdates',
   'automationRules',
+  'aiBotChats',
 ];
 const importerKeys = TABLE_IMPORTERS.map(importer => importer.key);
 for (const key of EXPECTED_TABLE_KEYS) {

@@ -254,6 +254,25 @@ export interface AutomationRuleRow {
   updatedAt: string | Date;
 }
 
+/**
+ * ai_bot_chats — the AI assistant's per-chat state. FK sessions ON DELETE CASCADE, so like
+ * automation_rules it must be re-inserted after the import's session wipe; above all `handoffAt`,
+ * or a restore hands every human-owned chat back to the assistant. Date columns are text on SQLite.
+ */
+export interface AiBotChatRow {
+  id: string;
+  sessionId: string;
+  chatId: string;
+  customerName: string | null;
+  firstReplyAt: string | Date | null;
+  followUpSentAt: string | Date | null;
+  introducedAt: string | Date | null;
+  handoffAt: string | Date | null;
+  handoffReason: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export interface MigrationTables {
   sessions: SessionRow[];
   webhooks: WebhookRow[];
@@ -270,6 +289,7 @@ export interface MigrationTables {
   integrationDeliveryFailures: IntegrationDeliveryFailureRow[];
   statusUpdates: StatusUpdateRow[];
   automationRules: AutomationRuleRow[];
+  aiBotChats: AiBotChatRow[];
 }
 
 export type TableCounts = { [K in keyof MigrationTables]: number };

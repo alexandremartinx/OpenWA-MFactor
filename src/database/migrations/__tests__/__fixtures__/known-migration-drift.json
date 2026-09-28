@@ -94,7 +94,19 @@
     "INSERT INTO \"temporary_automation_rules\"(\"id\", \"sessionId\", \"name\", \"enabled\", \"conditions\", \"replyText\", \"cooldownSeconds\", \"createdAt\", \"updatedAt\", \"newContactOnly\", \"pauseOnHumanReply\") SELECT \"id\", \"sessionId\", \"name\", \"enabled\", \"conditions\", \"replyText\", \"cooldownSeconds\", \"createdAt\", \"updatedAt\", \"newContactOnly\", \"pauseOnHumanReply\" FROM \"automation_rules\"",
     "DROP TABLE \"automation_rules\"",
     "ALTER TABLE \"temporary_automation_rules\" RENAME TO \"automation_rules\"",
-    "CREATE INDEX \"IDX_automation_rules_sessionId\" ON \"automation_rules\" (\"sessionId\") "
+    "CREATE INDEX \"IDX_automation_rules_sessionId\" ON \"automation_rules\" (\"sessionId\") ",
+    "DROP INDEX \"UQ_ai_bot_chats_sessionId_chatId\"",
+    "DROP INDEX \"UQ_ai_bot_chats_sessionId_chatId\"",
+    "CREATE TABLE \"temporary_ai_bot_chats\" (\"id\" varchar PRIMARY KEY NOT NULL, \"sessionId\" varchar NOT NULL, \"chatId\" varchar NOT NULL, \"customerName\" varchar(100), \"firstReplyAt\" text, \"followUpSentAt\" text, \"introducedAt\" text, \"handoffAt\" text, \"handoffReason\" varchar(300), \"createdAt\" datetime NOT NULL DEFAULT (datetime('now')), \"updatedAt\" datetime NOT NULL DEFAULT (datetime('now')))",
+    "INSERT INTO \"temporary_ai_bot_chats\"(\"id\", \"sessionId\", \"chatId\", \"customerName\", \"firstReplyAt\", \"followUpSentAt\", \"introducedAt\", \"handoffAt\", \"handoffReason\", \"createdAt\", \"updatedAt\") SELECT \"id\", \"sessionId\", \"chatId\", \"customerName\", \"firstReplyAt\", \"followUpSentAt\", \"introducedAt\", \"handoffAt\", \"handoffReason\", \"createdAt\", \"updatedAt\" FROM \"ai_bot_chats\"",
+    "INSERT INTO \"temporary_ai_bot_chats\"(\"id\", \"sessionId\", \"chatId\", \"customerName\", \"firstReplyAt\", \"followUpSentAt\", \"introducedAt\", \"handoffAt\", \"handoffReason\", \"createdAt\", \"updatedAt\") SELECT \"id\", \"sessionId\", \"chatId\", \"customerName\", \"firstReplyAt\", \"followUpSentAt\", \"introducedAt\", \"handoffAt\", \"handoffReason\", \"createdAt\", \"updatedAt\" FROM \"ai_bot_chats\"",
+    "DROP TABLE \"ai_bot_chats\"",
+    "DROP TABLE \"ai_bot_chats\"",
+    "ALTER TABLE \"temporary_ai_bot_chats\" RENAME TO \"ai_bot_chats\"",
+    "ALTER TABLE \"temporary_ai_bot_chats\" RENAME TO \"ai_bot_chats\"",
+    "CREATE UNIQUE INDEX \"UQ_ai_bot_chats_sessionId_chatId\" ON \"ai_bot_chats\" (\"sessionId\", \"chatId\") ",
+    "CREATE UNIQUE INDEX \"UQ_ai_bot_chats_sessionId_chatId\" ON \"ai_bot_chats\" (\"sessionId\", \"chatId\") ",
+    "CREATE TABLE \"temporary_ai_bot_chats\" (\"id\" varchar PRIMARY KEY NOT NULL, \"sessionId\" varchar NOT NULL, \"chatId\" varchar NOT NULL, \"customerName\" varchar(100), \"firstReplyAt\" text, \"followUpSentAt\" text, \"introducedAt\" text, \"handoffAt\" text, \"handoffReason\" varchar(300), \"createdAt\" datetime NOT NULL DEFAULT (datetime('now')), \"updatedAt\" datetime NOT NULL DEFAULT (datetime('now')), CONSTRAINT \"FK_2db550fef8c72f5091d2f794b43\" FOREIGN KEY (\"sessionId\") REFERENCES \"sessions\" (\"id\") ON DELETE CASCADE ON UPDATE NO ACTION)"
   ],
   "main": [
     "DROP INDEX \"IDX_api_keys_keyHash\"",

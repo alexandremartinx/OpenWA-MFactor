@@ -42,6 +42,7 @@ import { WebhookOutboxEvent } from '../webhook/entities/webhook-outbox-event.ent
 import { IntegrationDeliveryFailure } from '../integration/entities/integration-delivery-failure.entity';
 import { StatusUpdate } from '../status-store/entities/status-update.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
+import { AiBotChat } from '../automation/ai-bot/ai-bot-chat.entity';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { BadRequestException } from '@nestjs/common';
 
@@ -79,6 +80,7 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        AiBotChat,
       ],
       synchronize: true,
     });
@@ -1219,6 +1221,7 @@ describe('InfraDataController.import/export preserves every data-DB table', () =
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        AiBotChat,
       ],
       synchronize: true,
     });
@@ -1483,6 +1486,7 @@ describe('InfraDataController audit trail — import emits only on a committed r
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        AiBotChat,
       ],
       synchronize: true,
     });
@@ -1628,6 +1632,7 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
         IntegrationDeliveryFailure,
         StatusUpdate,
         AutomationRule,
+        AiBotChat,
       ],
       synchronize: true,
     });
@@ -1724,6 +1729,39 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
     expect(restored.cooldownSeconds).toBe(120);
     expect(restored.enabled).toBe(true);
     expect(restored.conditions).toEqual({ bodyContains: ['hello'] });
+  });
+
+  it('exports and restores ai_bot_chats, so a chat handed to a human stays the human’s', async () => {
+    await seedSession('s1');
+    const chatRepo = ds.getRepository(AiBotChat);
+    const handoffAt = new Date('2026-09-28T10:00:00.000Z');
+    await chatRepo.save(
+      chatRepo.create({
+        id: 'bot-chat-1',
+        sessionId: 's1',
+        chatId: '5511999990000@c.us',
+        customerName: 'Carlos',
+        firstReplyAt: new Date('2026-09-28T09:00:00.000Z'),
+        followUpSentAt: null,
+        introducedAt: new Date('2026-09-28T09:00:00.000Z'),
+        handoffAt,
+        handoffReason: 'Pediu um atendente',
+      }),
+    );
+
+    const controller = build();
+    const dump = await controller.exportData();
+    expect(dump.counts.aiBotChats).toBe(1);
+
+    const res = await controller.importData({ tables: dump.tables });
+
+    expect(res.imported).toBe(true);
+    expect(res.counts.aiBotChats).toBe(1);
+    const restored = await chatRepo.findOneByOrFail({ id: 'bot-chat-1' });
+    expect(restored.customerName).toBe('Carlos');
+    expect(restored.handoffAt?.toISOString()).toBe(handoffAt.toISOString());
+    expect(restored.handoffReason).toBe('Pediu um atendente');
+    expect(restored.followUpSentAt).toBeNull();
   });
 
   it('exports and restores status_updates (the table the docs promise is covered)', async () => {

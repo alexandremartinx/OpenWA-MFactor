@@ -2167,6 +2167,85 @@
         ]
       }
     },
+    "/api/sessions/{sessionId}/automation/ai-bot/chats": {
+      "get": {
+        "operationId": "AiBotController_findAll",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One entry per chat the assistant has acted in, most recently active first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiBotChatResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the AI assistant’s per-chat state",
+        "tags": [
+          "automation"
+        ]
+      }
+    },
+    "/api/sessions/{sessionId}/automation/ai-bot/chats/{chatId}/resume": {
+      "post": {
+        "operationId": "AiBotController_resume",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Session ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "description": "Chat ID, e.g. 5511999999999@c.us",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Handoff cleared; the assistant answers again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiBotChatResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The assistant has no state for this chat in this session."
+          }
+        },
+        "summary": "Give a handed-off chat back to the AI assistant",
+        "tags": [
+          "automation"
+        ]
+      }
+    },
     "/api/sessions/{sessionId}/messages": {
       "get": {
         "operationId": "MessageController_getMessages",
@@ -11144,6 +11223,75 @@
           }
         }
       },
+      "AiBotChatResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "chatId": {
+            "type": "string",
+            "example": "5511999999999@c.us"
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true,
+            "description": "How the person asked to be called."
+          },
+          "firstReplyAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Assistant's first message in the chat; operator messages after it silence the assistant."
+          },
+          "followUpSentAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the sales follow-up to the contact's automatic business greeting was sent."
+          },
+          "introducedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the assistant introduced itself to a real person."
+          },
+          "handoffAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Set while the chat belongs to a human; the assistant is silent."
+          },
+          "handoffReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sessionId",
+          "chatId",
+          "customerName",
+          "firstReplyAt",
+          "followUpSentAt",
+          "introducedAt",
+          "handoffAt",
+          "handoffReason",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "MessageListItemDto": {
         "type": "object",
         "properties": {
@@ -13710,6 +13858,12 @@
             "items": {
               "type": "object"
             }
+          },
+          "aiBotChats": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [
@@ -13727,7 +13881,8 @@
           "webhookOutboxEvents",
           "integrationDeliveryFailures",
           "statusUpdates",
-          "automationRules"
+          "automationRules",
+          "aiBotChats"
         ]
       },
       "TableCountsDto": {
@@ -13792,6 +13947,10 @@
           "automationRules": {
             "type": "number",
             "example": 2
+          },
+          "aiBotChats": {
+            "type": "number",
+            "example": 4
           }
         },
         "required": [
@@ -13809,7 +13968,8 @@
           "webhookOutboxEvents",
           "integrationDeliveryFailures",
           "statusUpdates",
-          "automationRules"
+          "automationRules",
+          "aiBotChats"
         ]
       },
       "OmittedInlineMediaDto": {
@@ -13931,6 +14091,9 @@
                 "type": "array"
               },
               "automationRules": {
+                "type": "array"
+              },
+              "aiBotChats": {
                 "type": "array"
               }
             }

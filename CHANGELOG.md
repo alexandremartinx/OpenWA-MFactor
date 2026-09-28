@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `messages.automated` marks an outbound row a bot wrote by itself, which is what lets
   `pauseOnHumanReply` tell an autoreply apart from an operator's send; every pre-existing and
   human-sent row reads `false`.
+- An opt-in AI assistant (`AI_BOT_ENABLED`) answers direct chats with contacts whose saved
+  address-book name contains `AI_BOT_CONTACT_MARKER`, from a Markdown system prompt and knowledge
+  base, through any OpenAI-compatible Chat Completions API. It sends one sales follow-up when only a
+  WhatsApp Business automatic greeting came back, introduces itself as a virtual assistant to the
+  first real person, and goes silent in a chat on handoff or once an operator replies there;
+  `GET /api/sessions/:id/automation/ai-bot/chats` shows each chat's state and `POST …/:chatId/resume` gives a
+  chat back.
 - `PUPPETEER_PROTOCOL_TIMEOUT_MS` raises the per-browser-command budget on the whatsapp-web.js
   engine, for large accounts whose reads fail with `Runtime.callFunctionOn timed out`. Unset keeps
   Puppeteer's own budget, so nothing changes for a deployment that does not set it. The gateway
@@ -23,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bulk sends now wait 10 s between messages by default (was 3 s), on top of the existing 0–2 s
+  jitter, so a batch reads less like a burst. `options.delayBetweenMessages` still takes any value
+  from 1000 to 60000 ms per batch.
 - A whatsapp-web.js protocol timeout is no longer eligible to be classified as a dead page.
   Behaviour is unchanged on the current Puppeteer; the guard keeps a future bump from reporting a
   slow command as a transport death.
@@ -30,9 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Inbound media whose download fails now keeps the `media` envelope with `omitted: true` and the declared
-- Bulk sends now wait 10 s between messages by default (was 3 s), on top of the existing 0–2 s
-  jitter, so a batch reads less like a burst. `options.delayBetweenMessages` still takes any value
-  from 1000 to 60000 ms per batch.
   size, on both engines, instead of dropping the field and looking like a message that never had media.
 - Webhook filters and automation rules gated on `hasMedia` now match those messages.
 - Baileys logs a failed inbound media download at `warn` instead of `debug`, so it is visible by default.

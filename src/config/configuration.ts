@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { computeFeatureFlags } from './feature-flags';
 import { computeSendPacingConfig } from '../modules/message/send-pacing.config';
+import { computeAiBotConfig } from '../modules/automation/ai-bot/ai-bot.config';
 import { resolveInflightBodyBudgetBytes } from './inflight-body-budget';
 import { readWsRateLimitConfig } from '../modules/events/ws-rate-limit';
 
@@ -133,6 +134,10 @@ export default () => ({
   // Outbound send pacing. Its own object rather than a feature flag: every field needs clamping,
   // because a bad value here decides whether messages are refused. See message/send-pacing.config.ts.
   sendPacing: computeSendPacingConfig(),
+
+  // LLM assistant for chats with contacts whose saved name carries AI_BOT_CONTACT_MARKER. Opt-in.
+  // See automation/ai-bot/ai-bot.config.ts.
+  aiBot: computeAiBotConfig(),
 
   // Redis configuration
   redis: {
