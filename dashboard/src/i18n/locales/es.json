@@ -608,7 +608,7 @@
     "bulkRecipientsHint": "Un número de teléfono o ID de chat por línea (máx. 100)",
     "bulkRecipientsCount": "Destinatarios: {{count}}",
     "bulkDelay": "Retraso entre mensajes (ms)",
-    "bulkDelayHint": "1000–60000 ms (predeterminado: 3000)",
+    "bulkDelayHint": "1000–60000 ms (predeterminado: 10000)",
     "send": "Enviar mensaje",
     "sending": "Enviando...",
     "viewOnly": "Solo lectura",

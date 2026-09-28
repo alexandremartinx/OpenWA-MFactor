@@ -12330,7 +12330,7 @@
           "delayBetweenMessages": {
             "type": "number",
             "description": "Delay between messages in ms.",
-            "default": 3000,
+            "default": 10000,
             "minimum": 1000,
             "maximum": 60000
           },

@@ -10,7 +10,7 @@ import {
 } from './bulk-message.service';
 import { MessageBatch, BatchStatus, BatchMessageStatus, BatchMessageResult } from './entities/message-batch.entity';
 import { MessageStatus } from './entities/message.entity';
-import { SendBulkMessageDto } from './dto/bulk-message.dto';
+import { DEFAULT_BULK_DELAY_MS, SendBulkMessageDto } from './dto/bulk-message.dto';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import type { IWhatsAppEngine } from '../../engine/interfaces/whatsapp-engine.interface';
 import { MessageService } from './message.service';
@@ -1166,6 +1166,28 @@ describe('BulkMessageService.createBatch base64 media cap', () => {
     expect(batch.messages.map(m => m.type)).toEqual(['text', 'image', 'text']);
     expect(batch.progress.total).toBe(3);
     expect(batch.progress.pending).toBe(3);
+  });
+
+  it('paces a batch with no options at the 10s default gap, jittered', async () => {
+    const dto = {
+      messages: [{ chatId: 'a@c.us', type: 'text' as const, content: { text: 'hi' } }],
+    } as unknown as SendBulkMessageDto;
+
+    const batch = await service.createBatch('s1', dto);
+
+    expect(DEFAULT_BULK_DELAY_MS).toBe(10_000);
+    expect(batch.options).toEqual({ delayBetweenMessages: 10_000, randomizeDelay: true, stopOnError: false });
+  });
+
+  it('keeps a caller-chosen delay over the default', async () => {
+    const dto = {
+      messages: [{ chatId: 'a@c.us', type: 'text' as const, content: { text: 'hi' } }],
+      options: { delayBetweenMessages: 20_000 },
+    } as unknown as SendBulkMessageDto;
+
+    const batch = await service.createBatch('s1', dto);
+
+    expect(batch.options.delayBetweenMessages).toBe(20_000);
   });
 
   it('runs the engine once per exact duplicate entry across the full create→process path', async () => {

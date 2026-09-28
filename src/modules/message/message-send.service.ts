@@ -89,7 +89,7 @@ export interface SendOrigin {
  * `queue-names.ts`, which intentionally defines no MESSAGE queue.
  *
  * Backpressure is applied at the edges instead: bulk sends self-throttle via
- * `delayBetweenMessages` (default 3s) and a per-process concurrent-batch cap (see
+ * `delayBetweenMessages` (default 10s) and a per-process concurrent-batch cap (see
  * `BulkMessageService`), and the global throttler enforces per-key rate limits.
  */
 @Injectable()

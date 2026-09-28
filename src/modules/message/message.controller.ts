@@ -20,6 +20,7 @@ import {
 } from './dto';
 import { SendTemplateMessageDto } from './dto/send-template.dto';
 import {
+  DEFAULT_BULK_DELAY_MS,
   SendBulkMessageDto,
   BulkMessageResponseDto,
   BatchStatusResponseDto,
@@ -643,7 +644,9 @@ export class MessageController {
     @Body() dto: SendBulkMessageDto,
   ): Promise<BulkMessageResponseDto> {
     const batch = await this.bulkMessageService.createBatch(sessionId, dto);
-    const estimatedTime = new Date(Date.now() + batch.messages.length * (batch.options?.delayBetweenMessages || 3000));
+    const estimatedTime = new Date(
+      Date.now() + batch.messages.length * (batch.options?.delayBetweenMessages || DEFAULT_BULK_DELAY_MS),
+    );
 
     return {
       batchId: batch.batchId,

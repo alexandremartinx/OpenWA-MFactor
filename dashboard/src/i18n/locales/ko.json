@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "한 줄에 하나의 전화번호 또는 채팅 ID (최대 100개)",
     "bulkRecipientsCount": "수신자: {{count}}",
     "bulkDelay": "메시지 간 지연 (ms)",
-    "bulkDelayHint": "1000–60000ms (기본값 3000)",
+    "bulkDelayHint": "1000–60000ms (기본값 10000)",
     "send": "메시지 보내기",
     "sending": "보내는 중...",
     "viewOnly": "읽기 전용",

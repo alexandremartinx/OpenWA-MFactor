@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "每行一个电话号码或聊天 ID（最多 100 个）",
     "bulkRecipientsCount": "接收者：{{count}}",
     "bulkDelay": "消息间隔延迟（毫秒）",
-    "bulkDelayHint": "1000–60000 毫秒（默认 3000）",
+    "bulkDelayHint": "1000–60000 毫秒（默认 10000）",
     "send": "发送消息",
     "sending": "正在发送...",
     "viewOnly": "仅查看",

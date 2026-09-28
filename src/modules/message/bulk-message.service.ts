@@ -18,7 +18,7 @@ import {
   BatchProgress,
   BatchMessageResult,
 } from './entities/message-batch.entity';
-import { SendBulkMessageDto } from './dto/bulk-message.dto';
+import { DEFAULT_BULK_DELAY_MS, SendBulkMessageDto } from './dto/bulk-message.dto';
 import { MessageStatus } from './entities/message.entity';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import { MessageService, DEFAULT_TEMPLATE_RENDER_MAX_CHARS } from './message.service';
@@ -232,7 +232,7 @@ export class BulkMessageService implements OnApplicationBootstrap {
       throw new BadRequestException(`Too many bulk batches in progress (max ${maxConcurrentBatches}); retry shortly`);
     }
     const options = {
-      delayBetweenMessages: dto.options?.delayBetweenMessages ?? 3000,
+      delayBetweenMessages: dto.options?.delayBetweenMessages ?? DEFAULT_BULK_DELAY_MS,
       randomizeDelay: dto.options?.randomizeDelay ?? true,
       stopOnError: dto.options?.stopOnError ?? false,
     };

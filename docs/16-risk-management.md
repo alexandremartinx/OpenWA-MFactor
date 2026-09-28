@@ -105,7 +105,7 @@ flowchart TB
 ```typescript
 // src/modules/message/bulk-message.service.ts — bulk-send pacing defaults
 const options = {
-  delayBetweenMessages: dto.options?.delayBetweenMessages ?? 3000, // 3s (DTO range 1000–60000)
+  delayBetweenMessages: dto.options?.delayBetweenMessages ?? DEFAULT_BULK_DELAY_MS, // 10s (DTO range 1000–60000)
   randomizeDelay: dto.options?.randomizeDelay ?? true, // adds 0–2s jitter per message
   stopOnError: dto.options?.stopOnError ?? false,
 };
@@ -545,7 +545,7 @@ The gateway enforces HTTP request throttling (`@nestjs/throttler`, registered gl
 | `RATE_LIMIT_SHORT_TTL` / `RATE_LIMIT_SHORT_LIMIT`     | 1000 ms / 10 requests      | HTTP burst window                                             |
 | `RATE_LIMIT_MEDIUM_TTL` / `RATE_LIMIT_MEDIUM_LIMIT`   | 60000 ms / 100 requests    | HTTP sustained window                                         |
 | `RATE_LIMIT_LONG_TTL` / `RATE_LIMIT_LONG_LIMIT`       | 3600000 ms / 1000 requests | HTTP hourly window                                            |
-| `delayBetweenMessages` / `randomizeDelay`             | 3000 ms + 0–2 s jitter     | Bulk send, between consecutive messages inside a batch        |
+| `delayBetweenMessages` / `randomizeDelay`             | 10000 ms + 0–2 s jitter    | Bulk send, between consecutive messages inside a batch        |
 | `BULK_MAX_CONCURRENT_BATCHES`                         | 50 (`0` = unlimited)       | Concurrent bulk batches per process                           |
 | `@ArrayMaxSize(100)` on `SendBulkMessageDto.messages` | 100 messages (hard limit)  | Messages accepted per bulk request                            |
 | `SIMULATE_TYPING` / `SIMULATE_TYPING_MAX_MS`          | on / 5000 ms               | Typing pause, text sends only (`send-text` / `send-template`) |

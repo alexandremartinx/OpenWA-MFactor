@@ -2102,7 +2102,7 @@ Send messages to multiple recipients as an async batch — returns immediately a
 
 Each `BulkMessageItemDto`: `{ chatId: string, type: 'text'|'image'|'video'|'audio'|'document', content: BulkMessageContentDto, variables?: Record<string,string> }`. `content` (all fields optional, nested-validated): `text?: string`, `image?`/`video?`/`audio?`/`document?`: `{ url?, base64?, mimetype?, filename? }`, `caption?: string`, `mentions?: string[]` (per item; a batch fans out to many chats, and a WID is only taggable in a chat the participant is in).
 
-`BulkMessageOptionsDto`: `{ delayBetweenMessages?: number (1000–60000, default 3000), randomizeDelay?: boolean (default true), stopOnError?: boolean (default false) }`.
+`BulkMessageOptionsDto`: `{ delayBetweenMessages?: number (1000–60000, default 10000), randomizeDelay?: boolean (default true), stopOnError?: boolean (default false) }`.
 
 Each item's base64 media is checked against the media byte cap (`MEDIA_DOWNLOAD_MAX_BYTES`) twice: at batch creation, and again per item after `variables` and the `message:sending` plugin gate are applied. An item that outgrows the cap only after rendering fails individually (`failed` in `results`, with `message:failed` fired) instead of being sent. `totalMessages` in the response reflects the de-duplicated item count.
 
@@ -2123,7 +2123,7 @@ The rendered text is bounded the same way, by `TEMPLATE_RENDER_MAX_CHARS` (defau
       "content": { "image": { "url": "https://example.com/promo.jpg" }, "caption": "Promo" }
     }
   ],
-  "options": { "delayBetweenMessages": 3000, "randomizeDelay": true, "stopOnError": false }
+  "options": { "delayBetweenMessages": 10000, "randomizeDelay": true, "stopOnError": false }
 }
 ```
 

@@ -624,7 +624,7 @@ export interface SendBulkRequest {
   /** Optional caller-supplied idempotency/batch id. */
   batchId?: string;
   options?: {
-    /** Minimum 1000 ms; default 3000. */
+    /** Minimum 1000 ms; default 10000. */
     delayBetweenMessages?: number;
     /** Randomize the delay between messages to look less automated. */
     randomizeDelay?: boolean;

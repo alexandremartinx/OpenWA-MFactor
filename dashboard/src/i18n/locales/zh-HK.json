@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "每行一個電話號碼或對話 ID（最多 100 個）",
     "bulkRecipientsCount": "收件人：{{count}}",
     "bulkDelay": "訊息之間的延遲（毫秒）",
-    "bulkDelayHint": "1000–60000 毫秒（預設 3000）",
+    "bulkDelayHint": "1000–60000 毫秒（預設 10000）",
     "send": "傳送訊息",
     "sending": "正在傳送...",
     "viewOnly": "僅檢視",

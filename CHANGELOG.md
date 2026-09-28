@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Inbound media whose download fails now keeps the `media` envelope with `omitted: true` and the declared
+- Bulk sends now wait 10 s between messages by default (was 3 s), on top of the existing 0–2 s
+  jitter, so a batch reads less like a burst. `options.delayBetweenMessages` still takes any value
+  from 1000 to 60000 ms per batch.
   size, on both engines, instead of dropping the field and looking like a message that never had media.
 - Webhook filters and automation rules gated on `hasMedia` now match those messages.
 - Baileys logs a failed inbound media download at `warn` instead of `debug`, so it is visible by default.
