@@ -405,4 +405,4 @@ Se um dia houver Cloud API oficial da Meta, aí sim botões reais.
 
 ========================================================================
 
-chave da api:  owa_k1_159092dfa8e959227d0a620c51325edb72cc3b49f5b2ace22354d1abe56a8a8c
+chave da api: fica só em data/.api-key (fora do git). Nunca cole a chave neste arquivo.
