@@ -67,6 +67,20 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'SEND_PACING_COLD_DAILY_CAP',
   'SEND_PACING_BREAKER_THRESHOLD',
   'SEND_PACING_BREAKER_COOLDOWN_MS',
+  // AI assistant, same arrangement: a blank AI_BOT_OPENAI_API_KEY forwarded by compose must not
+  // shadow the key in .env.
+  'AI_BOT_ENABLED',
+  'AI_BOT_OPENAI_API_KEY',
+  'AI_BOT_MODEL',
+  'AI_BOT_OPENAI_BASE_URL',
+  'AI_BOT_SYSTEM_PROMPT_FILE',
+  'AI_BOT_KNOWLEDGE_DIR',
+  'AI_BOT_CONTACT_MARKER',
+  'AI_BOT_HISTORY_LIMIT',
+  'AI_BOT_DEBOUNCE_MS',
+  'AI_BOT_MAX_REPLIES_PER_HOUR',
+  'AI_BOT_REQUEST_TIMEOUT_MS',
+  'AI_BOT_HANDOFF_NOTIFY_CHAT',
   // Server-side media conversion, same arrangement.
   'MEDIA_CONVERSION_ENABLED',
   'FFMPEG_PATH',

@@ -383,6 +383,8 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     // Read with `=== 'true'`, so a typo leaves sends unpaced — the silent failure this whole
     // feature exists to avoid, and invisible without this check.
     'SEND_PACING_ENABLED',
+    // Same class: a typo leaves the AI assistant silently off.
+    'AI_BOT_ENABLED',
     // Opt-in feature flags read with `=== 'true'`: a typo silently leaves the feature OFF, so the
     // conversion/archive endpoints answer as if nothing was configured. Same class as the above.
     'MEDIA_CONVERSION_ENABLED',

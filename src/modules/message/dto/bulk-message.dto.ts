@@ -25,6 +25,13 @@ import {
 import { IsMentionWidConstraint } from './is-mention-wid.validator';
 import { BatchMessageStatus, BatchStatus } from '../entities/message-batch.entity';
 
+/**
+ * Default gap between two sends in a batch when the caller doesn't pick one. 10s (plus the 0–2s jitter
+ * from `randomizeDelay`) keeps a 100-message batch around 18 minutes — slow enough not to read as a
+ * burst, which is what gets bulk-sending numbers restricted.
+ */
+export const DEFAULT_BULK_DELAY_MS = 10_000;
+
 class BulkMediaDto {
   @ApiPropertyOptional({ description: 'Media URL (http/https)' })
   @IsOptional()
@@ -129,7 +136,7 @@ class BulkMessageItemDto {
 class BulkMessageOptionsDto {
   @ApiPropertyOptional({
     description: 'Delay between messages in ms.',
-    default: 3000,
+    default: DEFAULT_BULK_DELAY_MS,
     minimum: 1000,
     maximum: 60000,
   })

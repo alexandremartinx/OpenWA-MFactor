@@ -2102,7 +2102,7 @@ Send messages to multiple recipients as an async batch — returns immediately a
 
 Each `BulkMessageItemDto`: `{ chatId: string, type: 'text'|'image'|'video'|'audio'|'document', content: BulkMessageContentDto, variables?: Record<string,string> }`. `content` (all fields optional, nested-validated): `text?: string`, `image?`/`video?`/`audio?`/`document?`: `{ url?, base64?, mimetype?, filename? }`, `caption?: string`, `mentions?: string[]` (per item; a batch fans out to many chats, and a WID is only taggable in a chat the participant is in).
 
-`BulkMessageOptionsDto`: `{ delayBetweenMessages?: number (1000–60000, default 3000), randomizeDelay?: boolean (default true), stopOnError?: boolean (default false) }`.
+`BulkMessageOptionsDto`: `{ delayBetweenMessages?: number (1000–60000, default 10000), randomizeDelay?: boolean (default true), stopOnError?: boolean (default false) }`.
 
 Each item's base64 media is checked against the media byte cap (`MEDIA_DOWNLOAD_MAX_BYTES`) twice: at batch creation, and again per item after `variables` and the `message:sending` plugin gate are applied. An item that outgrows the cap only after rendering fails individually (`failed` in `results`, with `message:failed` fired) instead of being sent. `totalMessages` in the response reflects the de-duplicated item count.
 
@@ -2123,7 +2123,7 @@ The rendered text is bounded the same way, by `TEMPLATE_RENDER_MAX_CHARS` (defau
       "content": { "image": { "url": "https://example.com/promo.jpg" }, "caption": "Promo" }
     }
   ],
-  "options": { "delayBetweenMessages": 3000, "randomizeDelay": true, "stopOnError": false }
+  "options": { "delayBetweenMessages": 10000, "randomizeDelay": true, "stopOnError": false }
 }
 ```
 
@@ -6335,14 +6335,33 @@ Single-message autoreply rules, managed under `/api/sessions/:sessionId/automati
 (`AutomationRuleController`). Every route requires an API key with **OPERATOR** role or higher.
 
 When an inbound message arrives, the session's enabled rules are evaluated in order — creation
-time, `id` as the same-second tiebreak — and the **first** rule whose `conditions` match replies
-into the chat with its `replyText`. The reply goes through the ordinary send path, so send pacing
+time, `id` as the same-second tiebreak — and the **first** rule whose `conditions` match, and whose
+chat-history gates allow it, replies into the chat with its `replyText`. The reply goes through the ordinary send path, so send pacing
 and plugin vetoes apply to it like any other outbound message. Evaluation is fire-and-forget off
 the receive path and runs at most once per message (engine re-fires are deduplicated).
 
 `conditions` uses the **webhook filter format** (`message` family — see 6.4.8): a flat AND list of
 conditions over `sender`, `recipient`, `body`, `type`, `isGroup`, `fromMe`, `hasMedia`, `mentions`.
-Omitted or empty conditions match every inbound message.
+Omitted or empty conditions match every inbound message — unless a chat-history gate is set.
+
+**Chat-history gates.** Two optional rule fields answer questions about the CHAT rather than about
+the message, which is why they are top-level fields and **not** `conditions` entries — a filter
+condition resolves out of the message payload alone, and `{ "field": "newContactOnly" }` inside
+`conditions` is rejected with a `400`:
+
+- `newContactOnly` — reply only when the chat has no earlier stored message in either direction, so
+  the rule is a first-contact greeting. A contact this account has ever exchanged a message with is
+  skipped, under either user-id spelling (`@c.us` / `@s.whatsapp.net`). "Ever" is bounded by
+  retention: a chat whose rows have been reaped reads as new again.
+- `pauseOnHumanReply` — stop replying in a chat once a **human** sends into it, whether from the
+  API, the dashboard, or a linked phone. The rule's own autoreplies are exempt: they are persisted
+  with `messages.automated = true`, which is what tells them apart from an operator's send. This is
+  **permanent**, not a window — a conversation an operator has taken over does not become the bot's
+  again on a timer. Clearing the chat's stored history is what re-arms the rule.
+
+Both gates read the `messages` table, and only for a rule that declares one. If that read fails,
+the rule does **not** reply: talking into a chat the operator fenced off is the worse of the two
+mistakes.
 
 Loop safety: a rule never answers the account's own (`fromMe`) messages, messages older than
 5 minutes get no automated answer (so a reconnect never burst-replies the offline-queued backlog),
@@ -6358,13 +6377,15 @@ Create a rule. **Auth:** API key (OPERATOR)
 
 **Request body**
 
-| Field           | Type    | Required | Description                                                        |
-| --------------- | ------- | -------- | ------------------------------------------------------------------ |
-| name            | string  | yes      | Display name, max 100 chars.                                       |
-| replyText       | string  | yes      | Reply content, max 4096 chars (the send-text limit).               |
-| conditions      | object  | no       | Webhook-filter conditions (`message` family). Omitted = match all. |
-| cooldownSeconds | number  | no       | Per-chat quiet period, 0–86400. Default `60`.                      |
-| enabled         | boolean | no       | Default `true`.                                                    |
+| Field             | Type    | Required | Description                                                          |
+| ----------------- | ------- | -------- | -------------------------------------------------------------------- |
+| name              | string  | yes      | Display name, max 100 chars.                                         |
+| replyText         | string  | yes      | Reply content, max 4096 chars (the send-text limit).                 |
+| conditions        | object  | no       | Webhook-filter conditions (`message` family). Omitted = match all.   |
+| cooldownSeconds   | number  | no       | Per-chat quiet period, 0–86400. Default `60`.                        |
+| enabled           | boolean | no       | Default `true`.                                                      |
+| newContactOnly    | boolean | no       | Reply only on a chat with no prior history. Default `false`.         |
+| pauseOnHumanReply | boolean | no       | Go quiet for good once a human sends into the chat. Default `false`. |
 
 **Response** `201`
 
@@ -6377,6 +6398,8 @@ Create a rule. **Auth:** API key (OPERATOR)
   "conditions": { "conditions": [{ "field": "body", "operator": "contains", "value": "price" }] },
   "replyText": "Thanks for reaching out — we reply within the hour.",
   "cooldownSeconds": 60,
+  "newContactOnly": false,
+  "pauseOnHumanReply": false,
   "createdAt": "2026-08-04T10:00:00.000Z",
   "updatedAt": "2026-08-04T10:00:00.000Z"
 }
@@ -6399,6 +6422,55 @@ Partial update (any subset of the create fields). **Auth:** API key (OPERATOR) �
 #### DELETE /api/sessions/:sessionId/automation-rules/:ruleId
 
 Delete a rule. **Auth:** API key (OPERATOR) · **Response** `204`.
+
+**AI assistant.** Next to the rules, the automation module carries an opt-in LLM assistant
+(`AI_BOT_ENABLED`, see `.env.example`), inspected and released under
+`/api/sessions/:sessionId/automation/ai-bot/chats` (`AiBotController`, **OPERATOR** role or higher). It rides the
+same inbound dispatch as the rules, with the same loop safety (never `fromMe`, nothing older than
+5 minutes), and replies through the ordinary send path with `messages.automated = true`.
+
+- It answers only direct chats whose contact's **saved** address-book name contains
+  `AI_BOT_CONTACT_MARKER` (default `- envio bot`), and re-reads the contact before every reply. The
+  push name is never matched: the sender controls it.
+- Its instructions are `AI_BOT_SYSTEM_PROMPT_FILE` plus every `*.md` of `AI_BOT_KNOWLEDGE_DIR`
+  (`README.md` skipped). Without either it does not reply.
+- When the only thing that came back after an outbound message is the contact's **automatic**
+  WhatsApp Business reply (greeting, away message), it sends one short sales follow-up, without
+  introducing itself. When a person answers, it introduces itself as a virtual assistant.
+- It goes silent in a chat when it hands off (its `transferir_para_humano` tool, or
+  `AI_BOT_MAX_REPLIES_PER_HOUR` replies within an hour), or when an operator sends into the chat
+  **after** its first reply. A campaign sent before it got involved does not count.
+  `AI_BOT_HANDOFF_NOTIFY_CHAT` receives a short notice on each handoff.
+
+#### GET /api/sessions/:sessionId/automation/ai-bot/chats
+
+List the assistant's per-chat state, most recently active first. **Auth:** API key (OPERATOR) ·
+**Response** `200`:
+
+```json
+[
+  {
+    "id": "7c0e2f4a-...",
+    "sessionId": "0d7a2a4e-...",
+    "chatId": "5511999999999@c.us",
+    "customerName": "Carlos",
+    "firstReplyAt": "2026-09-28T10:00:05.000Z",
+    "followUpSentAt": "2026-09-28T10:00:05.000Z",
+    "introducedAt": "2026-09-28T10:04:12.000Z",
+    "handoffAt": null,
+    "handoffReason": null,
+    "createdAt": "2026-09-28T10:00:05.000Z",
+    "updatedAt": "2026-09-28T10:04:12.000Z"
+  }
+]
+```
+
+#### POST /api/sessions/:sessionId/automation/ai-bot/chats/:chatId/resume
+
+Give a handed-off chat back to the assistant: clears `handoffAt` and moves the takeover baseline to
+now, so the operator messages that caused the handoff do not silence it again. **Auth:** API key
+(OPERATOR) · **Response** `200` — the updated entry · `404` when the assistant has no state for that
+chat in this session.
 
 ### 6.4.17 Integration fabric (ingress & instances)
 

@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "Eine Telefonnummer oder Chat-ID pro Zeile (max. 100)",
     "bulkRecipientsCount": "Empfänger: {{count}}",
     "bulkDelay": "Verzögerung zwischen Nachrichten (ms)",
-    "bulkDelayHint": "1000–60000 ms (Standard: 3000)",
+    "bulkDelayHint": "1000–60000 ms (Standard: 10000)",
     "send": "Nachricht senden",
     "sending": "Wird gesendet...",
     "viewOnly": "Nur ansehen",

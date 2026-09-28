@@ -568,7 +568,7 @@ curl -X POST "$BASE/api/sessions/$SESSION_ID/messages/send-bulk" \
       { "chatId": "628111111111@c.us", "type": "text", "content": { "text": "Hi {{name}}" }, "variables": { "name": "Alice" } },
       { "chatId": "628222222222@c.us", "type": "image", "content": { "image": { "url": "https://example.com/promo.jpg" }, "caption": "Promo" } }
     ],
-    "options": { "delayBetweenMessages": 3000, "randomizeDelay": true, "stopOnError": false }
+    "options": { "delayBetweenMessages": 10000, "randomizeDelay": true, "stopOnError": false }
   }'
 ```
 

@@ -232,6 +232,10 @@ export const EXPORT_TABLES: AnyExportTable[] = [
   // rule with it — exporting and re-inserting it is not optional, or a restore silently destroys
   // every autoreply rule.
   defineExportTable({ key: 'automationRules', table: 'automation_rules', optional: true }),
+
+  // ai_bot_chats cascades from sessions the same way. Losing it on a restore is not cosmetic: a
+  // chat handed to a human would get the assistant talking in it again.
+  defineExportTable({ key: 'aiBotChats', table: 'ai_bot_chats', optional: true }),
 ];
 
 /**

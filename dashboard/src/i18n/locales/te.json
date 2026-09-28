@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "ఒక్కో లైన్‌లో ఒక ఫోన్ నంబర్ లేదా చాట్ ID (గరిష్టంగా 100)",
     "bulkRecipientsCount": "గ్రహీతలు: {{count}}",
     "bulkDelay": "సందేశాల మధ్య విరామం (ms)",
-    "bulkDelayHint": "1000–60000 ms (డిఫాల్ట్ 3000)",
+    "bulkDelayHint": "1000–60000 ms (డిఫాల్ట్ 10000)",
     "send": "సందేశం పంపు",
     "sending": "పంపుతోంది...",
     "viewOnly": "చూడటానికి మాత్రమే",

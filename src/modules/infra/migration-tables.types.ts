@@ -65,6 +65,12 @@ export interface MessageRow {
    * it, and the import's explicit column list ignores it. Declared so both directions type-check.
    */
   body_ts?: unknown;
+  /**
+   * Bot-written marker (added after the chat-media pointers — keep the import list in sync). NOT
+   * NULL in the table; archives predating it restore to false, which is the truth for every row
+   * written before automated replies could mark themselves.
+   */
+  automated: boolean | number | null;
 }
 
 export interface MessageBatchRow {
@@ -238,6 +244,31 @@ export interface AutomationRuleRow {
   conditions: string | null;
   replyText: string;
   cooldownSeconds: number;
+  /**
+   * Chat-history gates (added after cooldownSeconds — keep the import list in sync). Archives
+   * predating them restore ungated, the pre-feature behaviour: every match replies.
+   */
+  newContactOnly: boolean | number | null;
+  pauseOnHumanReply: boolean | number | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+/**
+ * ai_bot_chats — the AI assistant's per-chat state. FK sessions ON DELETE CASCADE, so like
+ * automation_rules it must be re-inserted after the import's session wipe; above all `handoffAt`,
+ * or a restore hands every human-owned chat back to the assistant. Date columns are text on SQLite.
+ */
+export interface AiBotChatRow {
+  id: string;
+  sessionId: string;
+  chatId: string;
+  customerName: string | null;
+  firstReplyAt: string | Date | null;
+  followUpSentAt: string | Date | null;
+  introducedAt: string | Date | null;
+  handoffAt: string | Date | null;
+  handoffReason: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -258,6 +289,7 @@ export interface MigrationTables {
   integrationDeliveryFailures: IntegrationDeliveryFailureRow[];
   statusUpdates: StatusUpdateRow[];
   automationRules: AutomationRuleRow[];
+  aiBotChats: AiBotChatRow[];
 }
 
 export type TableCounts = { [K in keyof MigrationTables]: number };

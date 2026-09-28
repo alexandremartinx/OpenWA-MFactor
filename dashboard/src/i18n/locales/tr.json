@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "Her satıra bir telefon numarası veya sohbet ID'si (maks 100)",
     "bulkRecipientsCount": "Alıcılar: {{count}}",
     "bulkDelay": "Mesajlar Arası Gecikme (ms)",
-    "bulkDelayHint": "1000–60000 ms (varsayılan 3000)",
+    "bulkDelayHint": "1000–60000 ms (varsayılan 10000)",
     "send": "Mesajı Gönder",
     "sending": "Gönderiliyor...",
     "viewOnly": "Yalnızca Görüntüle",

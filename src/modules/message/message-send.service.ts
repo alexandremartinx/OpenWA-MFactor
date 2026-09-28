@@ -18,6 +18,7 @@ import { SsrfBlockedError, SSRF_BLOCKED_CLIENT_MESSAGE } from '../../common/secu
 import { resolveFeatureFlags } from '../../config/feature-flags';
 import { isUniqueViolation } from '../../common/utils/db-errors';
 import { ChatMediaArchiveService } from '../chat-media/chat-media-archive.service';
+import { toParticipantWid } from '../../engine/identity/wa-id';
 
 /** Default cap on a rendered template's final text; overridable via TEMPLATE_RENDER_MAX_CHARS. */
 export const DEFAULT_TEMPLATE_RENDER_MAX_CHARS = 64 * 1024;
@@ -31,6 +32,15 @@ export const DEFAULT_TEMPLATE_RENDER_MAX_CHARS = 64 * 1024;
 function isUrlPointerMetadata(metadata: Record<string, unknown> | undefined): boolean {
   const data = (metadata as { media?: { data?: unknown } } | undefined)?.media?.data;
   return typeof data === 'string' && /^https?:\/\//i.test(data);
+}
+
+/**
+ * Qualify a bare phone number (`5511999999999`) to a user WID before it reaches the engine or the
+ * DB, so a send to a number that is not a saved contact addresses the same chat an inbound reply
+ * will land in. Anything already qualified (users, groups, lids) passes through unchanged.
+ */
+function normalizeOutboundChatId(chatId: string): string {
+  return toParticipantWid(chatId);
 }
 
 /** Persistence payload for one outbound row written by {@link MessageSendService.saveOutgoingMessage}. */
@@ -50,6 +60,21 @@ export interface SaveOutgoingMessageData {
    * look the quoted message up, and '' is already reply()'s own value when that lookup fails.
    */
   quotedMessageId?: string;
+  /**
+   * Marks the row as written by a bot rather than by a human — see `Message.automated`. Only the
+   * automation autoreply path sets it; every other sender leaves it undefined and persists false.
+   */
+  automated?: boolean;
+}
+
+/**
+ * Out-of-band send options — deliberately a separate argument rather than fields on the send DTOs:
+ * these are decided by the CALLER's identity, not by the request body, and a REST client must not
+ * be able to pass `automated: true` and make its own send invisible to the human-reply gates.
+ */
+export interface SendOrigin {
+  /** See `Message.automated`. Set only by the automation autoreply path. */
+  automated?: boolean;
 }
 
 /**
@@ -64,7 +89,7 @@ export interface SaveOutgoingMessageData {
  * `queue-names.ts`, which intentionally defines no MESSAGE queue.
  *
  * Backpressure is applied at the edges instead: bulk sends self-throttle via
- * `delayBetweenMessages` (default 3s) and a per-process concurrent-batch cap (see
+ * `delayBetweenMessages` (default 10s) and a per-process concurrent-batch cap (see
  * `BulkMessageService`), and the global throttler enforces per-key rate limits.
  */
 @Injectable()
@@ -89,13 +114,14 @@ export class MessageSendService {
     private readonly chatMediaArchive?: ChatMediaArchiveService,
   ) {}
 
-  async sendText(sessionId: string, dto: SendTextMessageDto): Promise<MessageResponseDto> {
+  async sendText(sessionId: string, dto: SendTextMessageDto, opts?: SendOrigin): Promise<MessageResponseDto> {
+    const normalizedDto = { ...dto, chatId: normalizeOutboundChatId(dto.chatId) };
     // Asking to suppress the preview AND to attach one is a contradiction, and guessing which half
     // the caller meant would send a message they did not ask for either way.
-    if (dto.linkPreview === false && dto.customLinkPreview) {
+    if (normalizedDto.linkPreview === false && normalizedDto.customLinkPreview) {
       throw new BadRequestException('linkPreview: false cannot be combined with customLinkPreview');
     }
-    const finalDto = await this.applySendingGate(sessionId, 'text', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'text', normalizedDto);
 
     const engine = this.getEngine(sessionId);
 
@@ -105,6 +131,7 @@ export class MessageSendService {
       body: finalDto.text,
       type: 'text',
       quotedMessageId: finalDto.quotedMessageId,
+      automated: opts?.automated,
     });
 
     // Opt-in humanising "typing…" pause before the actual send (anti-automation signal).
@@ -218,12 +245,13 @@ export class MessageSendService {
    * 400 naming the limit rather than truncated silently or pushed to the engine/DB as-is.
    */
   async sendTemplate(sessionId: string, dto: SendTemplateMessageDto): Promise<MessageResponseDto> {
+    const normalizedDto = { ...dto, chatId: normalizeOutboundChatId(dto.chatId) };
     const template = await this.templateService.resolve(sessionId, {
-      templateId: dto.templateId,
-      templateName: dto.templateName,
+      templateId: normalizedDto.templateId,
+      templateName: normalizedDto.templateName,
     });
 
-    const vars = dto.vars ?? {};
+    const vars = normalizedDto.vars ?? {};
     const segments = [template.header, template.body, template.footer]
       .filter((segment): segment is string => segment != null && segment.length > 0)
       .map(segment => renderTemplate(segment, vars));
@@ -239,15 +267,18 @@ export class MessageSendService {
     }
 
     return this.sendText(sessionId, {
-      chatId: dto.chatId,
+      chatId: normalizedDto.chatId,
       text,
-      mentions: dto.mentions,
-      linkPreview: dto.linkPreview,
+      mentions: normalizedDto.mentions,
+      linkPreview: normalizedDto.linkPreview,
     });
   }
 
   async sendImage(sessionId: string, dto: SendMediaMessageDto): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'image', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'image', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
     const media = this.buildMediaInput(finalDto);
 
@@ -272,7 +303,10 @@ export class MessageSendService {
   }
 
   async sendVideo(sessionId: string, dto: SendMediaMessageDto): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'video', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'video', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
     const media = this.buildMediaInput(finalDto);
 
@@ -297,10 +331,11 @@ export class MessageSendService {
   }
 
   async sendAudio(sessionId: string, dto: SendAudioMessageDto): Promise<MessageResponseDto> {
+    const normalizedDto = { ...dto, chatId: normalizeOutboundChatId(dto.chatId) };
     // Label a PTT send 'voice' in the gate (not 'audio') so message:sending, message:failed, and the
     // persisted row all carry the same type for one outbound voice note — failSend and the saved row
     // already use `finalDto.ptt ? 'voice' : 'audio'`.
-    const finalDto = await this.applySendingGate(sessionId, dto.ptt ? 'voice' : 'audio', dto);
+    const finalDto = await this.applySendingGate(sessionId, normalizedDto.ptt ? 'voice' : 'audio', normalizedDto);
     const engine = this.getEngine(sessionId);
     // Voice notes need a real audio codec; default to ogg/opus when the caller omits a mimetype so the
     // wire message and the persisted record agree. Resolved BEFORE buildMediaInput so its base64
@@ -331,7 +366,10 @@ export class MessageSendService {
   }
 
   async sendDocument(sessionId: string, dto: SendMediaMessageDto): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'document', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'document', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
     const media = this.buildMediaInput(finalDto);
 
@@ -366,7 +404,10 @@ export class MessageSendService {
       quotedMessageId?: string;
     },
   ): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'location', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'location', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
 
     // Save message as pending BEFORE sending
@@ -396,7 +437,10 @@ export class MessageSendService {
     sessionId: string,
     dto: { chatId: string; contactName: string; contactNumber: string; quotedMessageId?: string },
   ): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'contact', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'contact', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
 
     // Save message as pending BEFORE sending
@@ -424,7 +468,10 @@ export class MessageSendService {
     sessionId: string,
     dto: { chatId: string; name: string; options: string[]; allowMultipleAnswers?: boolean; quotedMessageId?: string },
   ): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'poll', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'poll', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
 
     // Save message as pending BEFORE sending. A poll has no plain-text body, so store the
@@ -451,7 +498,10 @@ export class MessageSendService {
   }
 
   async sendSticker(sessionId: string, dto: SendMediaMessageDto): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'sticker', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'sticker', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
     const media = this.buildMediaInput(finalDto);
 
@@ -478,7 +528,10 @@ export class MessageSendService {
     sessionId: string,
     dto: { chatId: string; quotedMessageId: string; text: string; mentions?: string[] },
   ): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'reply', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'reply', {
+      ...dto,
+      chatId: normalizeOutboundChatId(dto.chatId),
+    });
     const engine = this.getEngine(sessionId);
 
     // Resolve the quoted message body (best-effort) so the dashboard can render the reply preview.
@@ -519,7 +572,10 @@ export class MessageSendService {
     sessionId: string,
     dto: { fromChatId: string; toChatId: string; messageId: string },
   ): Promise<MessageResponseDto> {
-    const finalDto = await this.applySendingGate(sessionId, 'forward', dto);
+    const finalDto = await this.applySendingGate(sessionId, 'forward', {
+      ...dto,
+      toChatId: normalizeOutboundChatId(dto.toChatId),
+    });
     const engine = this.getEngine(sessionId);
 
     // Save message as pending BEFORE sending
@@ -552,6 +608,7 @@ export class MessageSendService {
    * Baileys API send, a media-less marker), so dropping this write would lose the media payload.
    */
   async saveOutgoingMessage(sessionId: string, data: SaveOutgoingMessageData): Promise<Message> {
+    const normalizedChatId = normalizeOutboundChatId(data.chatId);
     const session = await this.sessionService.findOne(sessionId);
     const message = this.messageRepository.create({
       sessionId,
@@ -562,14 +619,15 @@ export class MessageSendService {
       // swallowed into a warning, losing the row silently. Normalizing at this one chokepoint covers
       // every caller instead of relying on each to remember.
       waMessageId: data.waMessageId || undefined,
-      chatId: data.chatId,
+      chatId: normalizedChatId,
       from: session?.phone || 'me',
-      to: data.chatId,
+      to: normalizedChatId,
       body: data.body,
       type: data.type,
       direction: MessageDirection.OUTGOING,
       timestamp: data.timestamp,
       status: data.status ?? MessageStatus.PENDING,
+      automated: data.automated ?? false,
       metadata: data.quotedMessageId
         ? { ...data.metadata, quotedMessage: { id: data.quotedMessageId, body: '' } }
         : data.metadata,
@@ -581,6 +639,10 @@ export class MessageSendService {
         status: message.status,
         timestamp: message.timestamp,
       };
+      // Carry the bot marker onto the surviving row. The echo writer cannot know a send was
+      // automated, so losing this race would leave an autoreply looking human — and a
+      // `pauseOnHumanReply` rule would then silence itself on its own reply.
+      if (message.automated) patch.automated = true;
       // Only when this write actually carries metadata worth merging: a text item must not blank
       // the echo's, and a URL pointer must not replace bytes the engine already downloaded.
       if (message.metadata && !isUrlPointerMetadata(message.metadata)) {
@@ -674,6 +736,9 @@ export class MessageSendService {
           },
         );
         const patch: QueryDeepPartialEntity<Message> = { status: MessageStatus.SENT, timestamp: result.timestamp };
+        // Same reason as in saveOutgoingMessage: the echo row defaults to automated=false, so the
+        // marker has to ride the merge or the autoreply is indistinguishable from a human send.
+        if (message.automated) patch.automated = true;
         if (message.metadata && !isUrlPointerMetadata(message.metadata)) {
           patch.metadata = message.metadata as QueryDeepPartialEntity<Record<string, unknown>>;
         }

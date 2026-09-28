@@ -654,7 +654,7 @@
     "bulkRecipientsHint": "Un numero di telefono o ID chat per riga (max 100)",
     "bulkRecipientsCount": "Destinatari: {{count}}",
     "bulkDelay": "Ritardo tra i messaggi (ms)",
-    "bulkDelayHint": "1000–60000 ms (predefinito: 3000)",
+    "bulkDelayHint": "1000–60000 ms (predefinito: 10000)",
     "send": "Invia Messaggio",
     "sending": "Invio in corso...",
     "viewOnly": "Sola Visualizzazione",
